@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 
@@ -38,7 +39,7 @@ namespace AmbientChanger
         {
             player.Volume = 0.4;
 
-            player.Open(new System.Uri(path));
+            player.Open(new Uri(path));
             player.Play();
         }
 

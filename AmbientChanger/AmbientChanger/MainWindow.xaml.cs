@@ -15,8 +15,14 @@ namespace AmbientChanger
     public partial class MainWindow : Window
     {
         private static bool STARTUP = true;
-        bool isKeyPressed = false;
+        private static bool isKeyPressed = false;
         private static bool THREAD_IS_RUNNING { get; set; }
+        private static string? PATH { get; set; }
+        private static Media CURRENT_PLAYER { get; set; }
+        private static List<List<string>> LISTS = new();
+        private static List<Player>? PLAYERS { get; set; }
+        private static List<int>? CURRENT_TRACK { get; set; }
+
 
         public MainWindow()
         {
@@ -32,64 +38,33 @@ namespace AmbientChanger
                 thread.Start();
             }
 
-            #region player1
-            if (player1.player.Volume != Player.MAX_VOLUME && player1.PLAYER_STATE == Player.State.Playing)
+
+            foreach (var player in (Media[]) Enum.GetValues(typeof(Media)))
             {
-                if (!player1.VOLUME_COOLDOWN)
+                if (PLAYERS![(int)player].player.Volume != Player.MAX_VOLUME && PLAYERS![(int)player].PLAYER_STATE == Player.State.Playing)
                 {
-                    player1.player.Volume += 0.1;
-                    player1.Cooldown(Player.FADE_SPEED);
-                }
+                    if (!PLAYERS![(int)player].VOLUME_COOLDOWN)
+                    {
+                        PLAYERS![(int)player].player.Volume += 0.1;
+                        PLAYERS![(int)player].Cooldown(Player.FADE_SPEED);
+                    }
 
-            }
-            else if (player1.player.Volume != 0 && player1.PLAYER_STATE == Player.State.Stopped)
-            {
-                if (!player1.VOLUME_COOLDOWN)
+                }
+                else if (PLAYERS![(int)player].player.Volume != 0 && PLAYERS![(int)player].PLAYER_STATE == Player.State.Stopped)
                 {
-                    player1.player.Volume -= 0.1;
-                    player1.Cooldown(Player.FADE_SPEED);
+                    if (!PLAYERS![(int)player].VOLUME_COOLDOWN)
+                    {
+                        PLAYERS![(int)player].player.Volume -= 0.1;
+                        PLAYERS![(int)player].Cooldown(Player.FADE_SPEED);
+                    }
+
                 }
-
-            }
-            else if (player1.player.Volume == 0 && player1.PLAYER_STATE == Player.State.Stopped)
-            {
-                player1.Stop();
-            }
-            #endregion
-
-            #region player2
-            if (player2.player.Volume != Player.MAX_VOLUME + 0.1 && player2.PLAYER_STATE == Player.State.Playing)
-            {
-                if (!player2.VOLUME_COOLDOWN)
+                else if (PLAYERS![(int)player].player.Volume == 0 && PLAYERS![(int)player].PLAYER_STATE == Player.State.Stopped)
                 {
-                    player2.player.Volume += 0.1;
-                    player2.Cooldown(Player.FADE_SPEED);
+                    PLAYERS![(int)player].Stop();
                 }
-
             }
-            else if (player2.player.Volume != 0 && player2.PLAYER_STATE == Player.State.Stopped)
-            {
-                if (!player2.VOLUME_COOLDOWN)
-                {
-                    player2.player.Volume -= 0.1;
-                    player2.Cooldown(Player.FADE_SPEED);
-                }
-
-            }
-            else if (player2.player.Volume == 0 && player2.PLAYER_STATE == Player.State.Stopped)
-            {
-                player2.Stop();
-            }
-            #endregion
-
         }
-
-        private static string? PATH { get; set; }
-        private static Media CURRENT_PLAYER { get; set; }
-        private static List<List<string>> lists = new();
-
-        private static Player player1 = new();
-        private static Player player2 = new();
 
         enum Hotkey
         {
@@ -113,6 +88,20 @@ namespace AmbientChanger
 
         public void Start()
         {
+            PLAYERS = new List<Player>();
+            Player player1 = new();
+            Player player2 = new();
+
+            PLAYERS.Add(player1);
+            PLAYERS.Add(player2);
+
+            PLAYERS[0].player.MediaEnded += OnPlayer1Ended;
+            PLAYERS[1].player.MediaEnded += OnPlayer2Ended;
+
+            CURRENT_TRACK = new();
+            CURRENT_TRACK.Add(-1);
+            CURRENT_TRACK.Add(-1);
+
             Save();
             Load();
             Init();
@@ -121,23 +110,25 @@ namespace AmbientChanger
         public void Change(int hotkey)
         {
             GetTracks(hotkey);
-            if (lists[hotkey].Count != 0)
+            if (LISTS[hotkey].Count != 0)
             {
                 Random rnd = new();
-                int track = rnd.Next(0, lists[hotkey].Count - 1);
+                int track = rnd.Next(0, LISTS[hotkey].Count - 1);
+                CURRENT_TRACK![0] = hotkey;
+                CURRENT_TRACK![1] = track;
                 switch (CURRENT_PLAYER)
                 {
                     case Media.Player1:
-                        player2.Play(lists[hotkey][track]);
-                        player2.PLAYER_STATE = Player.State.Playing;
-                        player1.PLAYER_STATE = Player.State.Stopped;
+                        PLAYERS![(int)Media.Player2].Play(LISTS[hotkey][track]);
+                        PLAYERS![(int)Media.Player2].PLAYER_STATE = Player.State.Playing;
+                        PLAYERS![(int)Media.Player1].PLAYER_STATE = Player.State.Stopped;
                         CURRENT_PLAYER = Media.Player2;
                         break;
 
                     case Media.Player2:
-                        player1.Play(lists[hotkey][track]);
-                        player1.PLAYER_STATE = Player.State.Playing;
-                        player2.PLAYER_STATE = Player.State.Stopped;
+                        PLAYERS![(int)Media.Player1].Play(LISTS[hotkey][track]);
+                        PLAYERS![(int)Media.Player1].PLAYER_STATE = Player.State.Playing;
+                        PLAYERS![(int)Media.Player2].PLAYER_STATE = Player.State.Stopped;
                         CURRENT_PLAYER = Media.Player1;
                         break;
                 }
@@ -231,14 +222,14 @@ namespace AmbientChanger
         private static void CreateLists()
         {
             for (int i = 0; i < 10; i++)
-                lists.Add(new List<string>());
+                LISTS.Add(new List<string>());
         }
 
         private static void GetTracks(int hotkey)
         {
             DirectoryInfo info = new($"{PATH}/Tracks/Numpad{hotkey}");
             foreach (var item in info.GetFiles("*.mp3*"))
-                lists[hotkey].Add(item.ToString());
+                LISTS[hotkey].Add(item.ToString());
         }
 
         private void VolumeHandler()
@@ -247,57 +238,69 @@ namespace AmbientChanger
             {
                 Dispatcher.Invoke(() =>
                 {
-                    #region player1
-                    if (player1.player.Volume != Player.MAX_VOLUME && player1.PLAYER_STATE == Player.State.Playing)
+                    foreach (var player in (Media[])Enum.GetValues(typeof(Media)))
                     {
-                        if (!player1.VOLUME_COOLDOWN)
+                        if (PLAYERS![(int)player].player.Volume != Player.MAX_VOLUME && PLAYERS![(int)player].PLAYER_STATE == Player.State.Playing)
                         {
-                            player1.player.Volume += 0.1;
-                            player1.Cooldown(Player.FADE_SPEED);
-                        }
+                            if (!PLAYERS![(int)player].VOLUME_COOLDOWN)
+                            {
+                                PLAYERS![(int)player].player.Volume += 0.1;
+                                PLAYERS![(int)player].Cooldown(Player.FADE_SPEED);
+                            }
 
-                    }
-                    else if (player1.player.Volume != 0 && player1.PLAYER_STATE == Player.State.Stopped)
-                    {
-                        if (!player1.VOLUME_COOLDOWN)
+                        }
+                        else if (PLAYERS![(int)player].player.Volume != 0 && PLAYERS![(int)player].PLAYER_STATE == Player.State.Stopped)
                         {
-                            player1.player.Volume -= 0.1;
-                            player1.Cooldown(Player.FADE_SPEED);
+                            if (!PLAYERS![(int)player].VOLUME_COOLDOWN)
+                            {
+                                PLAYERS![(int)player].player.Volume -= 0.1;
+                                PLAYERS![(int)player].Cooldown(Player.FADE_SPEED);
+                            }
+
                         }
-
-                    }
-                    else if (player1.player.Volume == 0 && player1.PLAYER_STATE == Player.State.Stopped)
-                    {
-                        player1.Stop();
-                    }
-                    #endregion
-
-                    #region player2
-                    if (player2.player.Volume != Player.MAX_VOLUME + 0.1 && player2.PLAYER_STATE == Player.State.Playing)
-                    {
-                        if (!player2.VOLUME_COOLDOWN)
+                        else if (PLAYERS![(int)player].player.Volume == 0 && PLAYERS![(int)player].PLAYER_STATE == Player.State.Stopped)
                         {
-                            player2.player.Volume += 0.1;
-                            player2.Cooldown(Player.FADE_SPEED);
+                            PLAYERS![(int)player].Stop();
                         }
-
                     }
-                    else if (player2.player.Volume != 0 && player2.PLAYER_STATE == Player.State.Stopped)
-                    {
-                        if (!player2.VOLUME_COOLDOWN)
-                        {
-                            player2.player.Volume -= 0.1;
-                            player2.Cooldown(Player.FADE_SPEED);
-                        }
-
-                    }
-                    else if (player2.player.Volume == 0 && player2.PLAYER_STATE == Player.State.Stopped)
-                    {
-                        player2.Stop();
-                    }
-                    #endregion
                 });
                 Thread.Sleep(50);
+            }
+        }
+
+        private void OnPlayer1Ended(object? sender, EventArgs e)
+        {
+            if (CURRENT_PLAYER == Media.Player1)
+            {
+                NextTrack();
+            }
+        }
+
+        private void OnPlayer2Ended(object? sender, EventArgs e)
+        {
+            if (CURRENT_PLAYER == Media.Player2)
+            {
+                NextTrack();
+            }
+        }
+
+        private void NextTrack()
+        {
+            if (LISTS[CURRENT_TRACK![0]].Count != 0)
+            {
+                if (LISTS[CURRENT_TRACK[0]].Count > 1)
+                {
+                    int track = CURRENT_TRACK[1];
+                    while (track == CURRENT_TRACK[1])
+                    {
+                        Random rnd = new();
+                        track = rnd.Next(0, LISTS[CURRENT_TRACK[0]].Count - 1);
+                    }
+                    CURRENT_TRACK[1] = track;
+                    PLAYERS![(int)CURRENT_PLAYER].Play(LISTS[CURRENT_TRACK[0]][track]);
+                }
+                else
+                    PLAYERS![(int)CURRENT_PLAYER].Play(LISTS[CURRENT_TRACK[0]][CURRENT_TRACK[1]]);
             }
         }
 
