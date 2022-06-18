@@ -201,8 +201,14 @@ namespace AmbientChanger
                             isKeyPressed = true;
                             Change(9);
                         });
+                    else if (Keyboard.IsKeyDown(Key.Pause))
+                        Dispatcher.Invoke(() =>
+                        {
+                            isKeyPressed = true;
+                            PausePlayer();
+                        });
                 }
-                else if (!Keyboard.IsKeyDown(Key.NumPad0) && !Keyboard.IsKeyDown(Key.NumPad1) && !Keyboard.IsKeyDown(Key.NumPad2) && !Keyboard.IsKeyDown(Key.NumPad3) && !Keyboard.IsKeyDown(Key.NumPad4) && !Keyboard.IsKeyDown(Key.NumPad5) && !Keyboard.IsKeyDown(Key.NumPad6) && !Keyboard.IsKeyDown(Key.NumPad7) && !Keyboard.IsKeyDown(Key.NumPad8) && !Keyboard.IsKeyDown(Key.NumPad9))
+                else if (!Keyboard.IsKeyDown(Key.NumPad0) && !Keyboard.IsKeyDown(Key.NumPad1) && !Keyboard.IsKeyDown(Key.NumPad2) && !Keyboard.IsKeyDown(Key.NumPad3) && !Keyboard.IsKeyDown(Key.NumPad4) && !Keyboard.IsKeyDown(Key.NumPad5) && !Keyboard.IsKeyDown(Key.NumPad6) && !Keyboard.IsKeyDown(Key.NumPad7) && !Keyboard.IsKeyDown(Key.NumPad8) && !Keyboard.IsKeyDown(Key.NumPad9) && !Keyboard.IsKeyDown(Key.Pause))
                     isKeyPressed = false;
 
                 Thread.Sleep(50);
@@ -304,6 +310,24 @@ namespace AmbientChanger
             }
         }
 
+        private void PausePlayer()
+        {
+            foreach (var player in (Media[])Enum.GetValues(typeof(Media)))
+            {
+                if (PLAYERS![(int)player].PLAYER_STATE == Player.State.Playing)
+                {
+                    PLAYERS![(int)player].PLAYER_STATE = Player.State.Paused;
+                    PLAYERS![(int)player].Pause();
+                }
+                else if (PLAYERS![(int)player].PLAYER_STATE == Player.State.Paused)
+                {
+                    PLAYERS![(int)player].PLAYER_STATE = Player.State.Playing;
+                    PLAYERS![(int)player].player.Play();
+
+                }
+            }
+        }
+
         #region Saving
         public static void Save()
         {
@@ -316,6 +340,15 @@ namespace AmbientChanger
                         Directory.CreateDirectory($"Player/Tracks/Numpad{i}");
 
                     File.WriteAllText("Player/READ ME.txt", "");
+                }
+                if (!Directory.Exists("Player/Settings"))
+                {
+                    Directory.CreateDirectory($"Player/Settings");
+                }
+                if (!Directory.Exists("Player/Tracks"))
+                {
+                    for (int i = 0; i < 10; i++)
+                        Directory.CreateDirectory($"Player/Tracks/Numpad{i}");
                 }
                 if (!File.Exists($"Player/Settings/Player.xml"))
                 {

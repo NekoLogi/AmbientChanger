@@ -18,7 +18,8 @@ namespace AmbientChanger
         public enum State
         {
             Playing,
-            Stopped
+            Stopped,
+            Paused
         }
 
 
@@ -46,6 +47,11 @@ namespace AmbientChanger
         public void Stop()
         {
             player.Stop();
+        }
+
+        public void Pause()
+        {
+            player.Pause();
         }
     }
 }
